@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Nexogram">
+<title>Nexogram</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;font:16px -apple-system,Roboto,sans-serif;background:#F2F2F6;color:#000}
+#app{height:100dvh;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}
+.pg{flex:1;overflow:auto;padding:14px 14px 110px}
+h1{margin:6px 4px 12px;font-size:30px}
+input{width:100%;padding:13px;margin:0 0 10px;border:0;border-radius:12px;background:#fff;font:inherit}
+.btn{width:100%;padding:14px;border:0;border-radius:12px;background:#3B82F6;color:#fff;font-weight:700;font:inherit;font-weight:700;margin-bottom:8px}
+.btn.red{background:#FF3B30}.btn.org{background:#FF9500}.btn.grn{background:#34C759}
+.lnk{background:none;border:0;color:#3B82F6;font:inherit;display:block;margin:14px auto}
+.row{display:flex;align-items:center;gap:12px;background:#fff;padding:11px;border-radius:12px;margin-bottom:3px}
+.row .t{flex:1;min-width:0}.row small{display:block;color:#8E8E93;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.av{width:44px;height:44px;border-radius:50%;background:#3B82F6;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;flex:none}
+.ic{background:none;border:0;font-size:22px}
+nav{position:fixed;left:20px;right:20px;bottom:calc(18px + env(safe-area-inset-bottom));height:66px;display:flex;background:rgba(255,255,255,.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:30px;box-shadow:0 10px 25px rgba(0,0,0,.12)}
+nav button{flex:1;border:0;background:none;font-size:11px;color:#888;display:flex;flex-direction:column;align-items:center;justify-content:center}
+nav button span{font-size:22px}nav .on{color:#000;font-weight:700}
+.top{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#fff}
+.top button{background:none;border:0;font-size:26px;color:#3B82F6}
+#ms{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:6px}
+.b{max-width:78%;padding:9px 12px;border-radius:16px;background:#fff;align-self:flex-start;word-wrap:break-word}
+.b.me{background:#3B82F6;color:#fff;align-self:flex-end}
+.ib{display:flex;gap:8px;padding:10px 10px calc(10px + env(safe-area-inset-bottom));background:#fff}
+.ib input{margin:0;background:#F2F2F6;border-radius:20px}
+.ib button{width:44px;border:0;border-radius:50%;background:#3B82F6;color:#fff;font-size:18px}
+.card{background:#fff;padding:14px;border-radius:12px;margin-bottom:10px}
+.gr{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.g{border:0;border-radius:18px;padding:14px 0;font-size:40px;text-align:center}
+.g small{display:block;font-size:13px;color:#444;font-weight:700}
+.ctr{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:9}.env{font-size:100px;animation:pu 1s infinite}@keyframes pu{50%{transform:scale(1.25)}}
+.adm{background:#111;color:#fff}.adm input{background:#333;color:#fff}
+</style></head><body>
+<div id="app"></div>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,sendPasswordResetEmail} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+import {getFirestore,doc,setDoc,updateDoc,onSnapshot,collection,query,where,orderBy,limit,addDoc,serverTimestamp,getDocs,arrayUnion,increment} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
+const app=initializeApp({apiKey:'AIzaSyC0GTMP5WvuC8dR6f4qALPE8brWWxQIn58',authDomain:'nexogram-7b346.firebaseapp.com',projectId:'nexogram-7b346',storageBucket:'nexogram-7b346.firebasestorage.app',messagingSenderId:'667524591051',appId:'1:667524591051:web:af3f42d908b1b1b77fda4e'});
+const auth=getAuth(app),db=getFirestore(app);
+const ADMINS={'davletshinmalik@icloud.com':'+79897043997'};
+const GIFTS=[['cat','🐱','Кот',24830],['glasses','🕶️','Очки',11457],['cake','🎂','Тортик',75],['star','⭐','Звезда',100],['heart','❤️','Сердце',50],['rocket','🚀','Ракета',500]];
+const ERR={'auth/invalid-email':'Неверный email','auth/email-already-in-use':'Email уже занят','auth/weak-password':'Пароль минимум 6 символов','auth/invalid-credential':'Неверный email или пароль','auth/network-request-failed':'Нет интернета'};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ms_=x=>x?.toMillis?.()??Date.now();
+
+let bd=0,bdDone=false,user,me=null,cfg={},tab='chats',sub=null,mode='login',users=[],chats=[],peer=null,msgs=[],unsubs=[],unM=null;
+
+/* ---------- отрисовка ---------- */
+function render(){
+  const A=$('#app');
+  if(user===undefined||(user&&!me)){A.innerHTML='<div class="ctr">Загрузка…</div>';return}
+  if(!user){A.innerHTML=authV();return}
+  if(me.frozen){A.innerHTML=note('🧊','Аккаунт заморожен','Обратись к администрации');return}
+  if(cfg.closed&&!me.isAdmin){A.innerHTML=note('🔒','Приложение закрыто','Зайди позже');return}
+  if(peer){A.innerHTML=chatV();updMsgs();return}
+  let h=sub==='profile'?profV():sub==='privacy'?privV():sub==='gifts'?giftsV():sub==='admin'?adminV():tab==='contacts'?contactsV():tab==='chats'?chatsV():setV();
+  A.innerHTML=`<div class="pg ${sub==='admin'?'adm':''}">${h}</div><nav>${[['contacts','👥','Контакты'],['chats','💬','Чаты'],['settings','⚙️','Настройки']].map(([t,i,l])=>`<button data-a="tab" data-t="${t}" class="${tab===t&&!sub?'on':''}"><span>${i}</span>${l}</button>`).join('')}</nav>`+bdV();
+}
+const ui=()=>{if(document.activeElement?.tagName==='INPUT'||peer)return;render()};
+const note=(e,t,s)=>`<div class="ctr"><div style="font-size:60px">${e}</div><h2>${t}</h2><p>${s}</p><button class="lnk" data-a="logout">Выйти</button></div>`;
+const authV=()=>`<div class="ctr" style="justify-content:center"><div style="font-size:60px">💬</div><h1>${mode==='login'?'Вход':'Регистрация'}</h1><div style="width:100%;max-width:340px">${mode==='register'?'<input id="nn" placeholder="Никнейм">':''}<input id="em" type="email" placeholder="Email" autocapitalize="none"><input id="pw" type="password" placeholder="Пароль"><button class="btn" data-a="auth">${mode==='login'?'Войти':'Создать аккаунт'}</button><button class="lnk" data-a="mode">${mode==='login'?'Нет аккаунта? Регистрация':'Уже есть аккаунт? Войти'}</button>${mode==='login'?'<button class="lnk" data-a="reset">Забыл пароль</button>':''}</div></div>`;
+const contactsV=()=>`<h1>Контакты</h1><input id="q" placeholder="Поиск">${users.filter(u=>u.id!==user.uid).map(u=>`<div class="row" data-s="${esc((u.nickname+' '+u.email).toLowerCase())}" data-a="open" data-id="${u.id}" data-n="${esc(u.nickname)}"><div class="av">${esc(u.nickname?.[0]?.toUpperCase())}</div><div class="t"><b>${esc(u.nickname)}${u.isAdmin?' 🛡️':''}</b></div></div>`).join('')||'<p style="text-align:center;color:#888">Пока никого нет</p>'}`;
+const chatsV=()=>`<h1>Чаты</h1>${chats.map(c=>{const id=c.participants.find(p=>p!==user.uid),n=c.names?.[id]||'Пользователь';return`<div class="row" data-a="open" data-id="${id}" data-n="${esc(n)}"><div class="av">${esc(n[0]?.toUpperCase())}</div><div class="t"><b>${esc(n)}</b><small>${esc(c.lastMessage)}</small></div></div>`}).join('')||'<p style="text-align:center;color:#888">Нет чатов.<br>Найди человека во вкладке «Контакты»</p>'}`;
+const setV=()=>`<h1>Настройки</h1><div class="card"><b>${esc(me.nickname)}${me.isAdmin?' 🛡️':''}</b><br><small style="color:#888">${esc(me.phone||me.email)}</small></div>${[['profile','#FF7675','👤','Мой профиль'],['privacy','#B2BEC3','🔒','Конфиденциальность'],['gifts','#FDCB6E','🎁','Мои подарки']].map(([s,c,i,l])=>`<div class="row" data-a="sub" data-s="${s}"><div class="av" style="background:${c};border-radius:10px;width:34px;height:34px">${i}</div><div class="t">${l}</div>›</div>`).join('')}${me.isAdmin?'<button class="btn red" style="margin-top:14px" data-a="sub" data-s="admin">🛡️ Панель разработчика</button>':''}<button class="btn" style="background:#fff;color:#FF3B30;margin-top:10px" data-a="logout">Выйти</button>`;
+const profV=()=>`<button class="lnk" data-a="sub" style="margin:0 0 8px">‹ Назад</button><h1>Мой профиль</h1><small>Никнейм</small><input id="nk" value="${esc(me.nickname)}"><small>Email</small><input value="${esc(me.email)}" disabled><small>День рождения (ДД.ММ)</small><input id="bd" value="${esc(me.birthday||'')}" placeholder="05.03" inputmode="numeric"><button class="btn" data-a="prof">Сохранить</button>`;
+const privV=()=>`<button class="lnk" data-a="sub" style="margin:0 0 8px">‹ Назад</button><h1>Конфиденциальность</h1><div class="card"><small>Твой email</small><br><b>${esc(me.email)}</b><p style="color:#888;font-size:13px">Другие пользователи видят только твой никнейм.</p></div><button class="btn" data-a="pass">Сменить пароль по email</button>`;
+const bdV=()=>{const n=new Date(),t=String(n.getDate()).padStart(2,'0')+'.'+String(n.getMonth()+1).padStart(2,'0');
+  if(!me||me.birthday!==t||me.birthdayClaimedYear===n.getFullYear()||bdDone)return'';
+  const w=x=>`<div class="ov">${x}</div>`,c=x=>`<div class="card" style="width:85%;text-align:center;padding:26px">${x}</div>`;
+  if(bd===0)return w('<div data-a="bd1" style="text-align:center;color:#fff"><div class="env">💌</div><b style="font-size:20px">Нажми на меня</b></div>');
+  if(bd===1)return w(c(`<h2>С Днём Рождения, ${esc(me.nickname)}! 🎉</h2><p style="color:#555">Команда разработчиков поздравляет тебя! Мы подготовили особенный подарок — уникальный NFT-торт 🎂</p><button class="btn" data-a="bd2">Получить подарок</button>`));
+  return w(c('<div style="font-size:80px">🎂</div><h2>Подарок получен!</h2><button class="btn" data-a="bdc">Забрать в профиль</button>'))};
+const giftsV=()=>`<button class="lnk" data-a="sub" style="margin:0 0 8px">‹ Назад</button><h1>Подарки</h1><p>Баланс: ⭐ ${me.balance||0}</p>${me.gifts?.length?`<div class="card" style="font-size:34px">${me.gifts.map(i=>GIFTS.find(g=>g[0]===i)?.[1]).join(' ')}</div>`:''}<div class="gr">${GIFTS.map(g=>`<button class="g" data-a="buy" data-g="${g[0]}">${g[1]}<small>⭐ ${g[3]}</small></button>`).join('')}</div>`;
+const adminV=()=>`<button class="lnk" data-a="sub" style="margin:0 0 8px">‹ Назад</button><h1>🛡️ Админ-панель</h1><input id="ae" placeholder="Email пользователя" autocapitalize="none"><button class="btn org" data-a="adm" data-k="frz">Заморозить / разморозить</button><input id="am" type="number" value="100"><button class="btn grn" data-a="adm" data-k="coin">Выдать звёзды</button><p>Выдать подарок:</p><div class="gr">${GIFTS.map(g=>`<button class="g" style="background:#333" data-a="adm" data-k="gift" data-g="${g[0]}">${g[1]}</button>`).join('')}</div><br><button class="btn red" data-a="adm" data-k="app">${cfg.closed?'Открыть приложение':'Закрыть приложение для всех'}</button><p style="color:#888">Сейчас: ${cfg.closed?'🔴 закрыто':'🟢 открыто'}</p>`;
+const chatV=()=>`<div class="top"><button data-a="back">‹</button><b>${esc(peer.name)}</b><span style="width:26px"></span></div><div id="ms"></div><div class="ib"><input id="mi" placeholder="Сообщение" autocomplete="off"><button data-a="send">➤</button></div>`;
+function updMsgs(){const m=$('#ms');if(!m)return;m.innerHTML=msgs.map(x=>`<div class="b ${x.from===user.uid?'me':''}">${esc(x.text)}</div>`).join('');m.scrollTop=m.scrollHeight}
+
+/* ---------- Firebase ---------- */
+function start(){
+  unsubs=[
+    onSnapshot(doc(db,'users',user.uid),s=>{me=s.exists()?{id:s.id,...s.data()}:null;ui()},()=>{}),
+    onSnapshot(doc(db,'config','app'),s=>{cfg=s.exists()?s.data():{};ui()},()=>{}),
+    onSnapshot(collection(db,'users'),s=>{users=s.docs.map(d=>({id:d.id,...d.data()}));ui()},()=>{}),
+    onSnapshot(query(collection(db,'chats'),where('participants','array-contains',user.uid)),s=>{chats=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>ms_(b.updatedAt)-ms_(a.updatedAt));ui()},()=>{})];
+}
+function stop(){unsubs.forEach(u=>u());unsubs=[];unM&&unM();unM=null;me=null;peer=null;}
+onAuthStateChanged(auth,u=>{user=u;if(u)start();else{stop()}render()});
+const cid=id=>[user.uid,id].sort().join('_');
+async function target(){const s=await getDocs(query(collection(db,'users'),where('email','==',$('#ae').value.trim().toLowerCase())));if(s.empty){alert('Не найден');return null}return s.docs[0]}
+
+/* ---------- действия ---------- */
+const acts={
+  mode(){mode=mode==='login'?'register':'login';render()},
+  async auth(){const e=$('#em').value.trim().toLowerCase(),p=$('#pw').value;
+    try{if(mode==='login')await signInWithEmailAndPassword(auth,e,p);else{const n=$('#nn').value.trim();if(!n)return alert('Введи никнейм');const c=await createUserWithEmailAndPassword(auth,e,p),ph=ADMINS[e];
+      await setDoc(doc(db,'users',c.user.uid),{nickname:n,email:e,phone:ph||null,isAdmin:!!ph,frozen:false,balance:0,gifts:[],birthday:null,birthdayClaimedYear:null,createdAt:serverTimestamp()})}}catch(x){alert(ERR[x.code]||x.message)}},
+  async reset(){const e=$('#em').value.trim();if(!e)return alert('Введи email');try{await sendPasswordResetEmail(auth,e);alert('Письмо отправлено')}catch(x){alert(ERR[x.code]||x.message)}},
+  tab(d){tab=d.t;sub=null;render()},
+  sub(d){sub=d.s||null;render()},
+  open(d){peer={id:d.id,name:d.n};msgs=[];render();unM&&unM();
+    unM=onSnapshot(query(collection(db,'chats',cid(d.id),'messages'),orderBy('createdAt','desc'),limit(100)),s=>{msgs=s.docs.map(x=>x.data()).reverse();updMsgs()},()=>{})},
+  back(){unM&&unM();unM=null;peer=null;render()},
+  async send(){const i=$('#mi'),t=i.value.trim();if(!t)return;i.value='';
+    try{await setDoc(doc(db,'chats',cid(peer.id)),{participants:[user.uid,peer.id],names:{[user.uid]:me.nickname,[peer.id]:peer.name},lastMessage:t,updatedAt:serverTimestamp()},{merge:true});
+      await addDoc(collection(db,'chats',cid(peer.id),'messages'),{text:t,from:user.uid,createdAt:serverTimestamp()})}catch(x){alert('Ошибка: '+x.message)}},
+  async prof(){const n=$('#nk').value.trim(),b=$('#bd').value.trim();if(!n)return alert('Введи никнейм');
+    if(b&&!/^(0[1-9]|[12]\d|3[01])\.(0[1-9]|1[0-2])$/.test(b))return alert('День рождения: формат ДД.ММ, например 05.03');
+    try{await updateDoc(doc(db,'users',user.uid),{nickname:n,birthday:b||null});alert('Сохранено');sub=null;render()}catch(x){alert(x.message)}},
+  async pass(){try{await sendPasswordResetEmail(auth,me.email);alert('Письмо для смены пароля отправлено на '+me.email)}catch(x){alert(x.message)}},
+  bd1(){bd=1;render()},bd2(){bd=2;render()},
+  async bdc(){bdDone=true;render();try{await updateDoc(doc(db,'users',user.uid),{gifts:arrayUnion('cake'),birthdayClaimedYear:new Date().getFullYear()})}catch(x){}},
+  async buy(d){const g=GIFTS.find(x=>x[0]===d.g);if(me.gifts?.includes(g[0]))return alert('Уже есть');if((me.balance||0)<g[3])return alert('Не хватает звёзд');
+    if(confirm(`Купить «${g[2]}» за ⭐ ${g[3]}?`))try{await updateDoc(doc(db,'users',user.uid),{balance:increment(-g[3]),gifts:arrayUnion(g[0])})}catch(x){alert(x.message)}},
+  async adm(d){try{
+    if(d.k==='app'){await setDoc(doc(db,'config','app'),{closed:!cfg.closed},{merge:true});return}
+    const t=await target();if(!t)return;
+    if(d.k==='frz')await updateDoc(t.ref,{frozen:!t.data().frozen});
+    if(d.k==='coin')await updateDoc(t.ref,{balance:increment(parseInt($('#am').value)||0)});
+    if(d.k==='gift')await updateDoc(t.ref,{gifts:arrayUnion(d.g)});
+    alert('Готово')}catch(x){alert('Ошибка: '+x.message)}},
+  logout(){signOut(auth)}
+};
+document.addEventListener('click',e=>{const t=e.target.closest('[data-a]');if(t){e.stopPropagation();acts[t.dataset.a]?.(t.dataset)}});
+document.addEventListener('input',e=>{if(e.target.id==='q'){const v=e.target.value.toLowerCase();document.querySelectorAll('[data-s]').forEach(r=>r.style.display=r.dataset.s.includes(v)?'':'none')}});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='mi')acts.send()});
+</script></body></html>
